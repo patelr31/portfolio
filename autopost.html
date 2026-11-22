@@ -74,24 +74,21 @@
     const status = p.status;
     const upd = () => { count.textContent = `${ta.value.length} / 3000 characters. Status: ${status}.`; };
     ta.addEventListener("input", upd); upd();
-    const post = document.createElement("button"); post.className = "go"; post.textContent = "Save and post";
-    const save = document.createElement("button"); save.className = "alt"; save.textContent = "Save only";
+    const save = document.createElement("button"); save.className = "go"; save.textContent = "Save";
     const msg = document.createElement("p"); msg.className = "muted";
-    const row = document.createElement("div"); row.className = "row"; row.append(post, save);
+    const row = document.createElement("div"); row.className = "row"; row.append(save);
     $out.replaceChildren(ta, count, row, msg);
-    if (status === "posted") { post.disabled = save.disabled = true; msg.textContent = "Already on LinkedIn, so it can't be edited here."; }
+    if (status === "posted") { save.disabled = true; msg.textContent = "Already on LinkedIn, so it can't be edited here."; }
+    else msg.textContent = "Changes go out with the scheduled post at 9 am New York time.";
 
-    async function submit(go) {
-      if (go === "post" && !confirm("Publish this to LinkedIn now?")) return;
-      post.disabled = save.disabled = true; msg.textContent = go === "post" ? "Posting…" : "Saving…";
+    save.onclick = async () => {
+      save.disabled = true; msg.textContent = "Saving…";
       try {
-        const r = await call({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: ta.value, go }) });
-        if (go === "post" || r.error) show(r.title, r.message || "", r.link || "", !!r.error);
-        else { msg.textContent = r.message || "Saved."; post.disabled = save.disabled = false; }
-      } catch (e) { msg.textContent = String(e.message || e); post.disabled = save.disabled = false; }
-    }
-    post.onclick = () => submit("post");
-    save.onclick = () => submit("save");
+        const r = await call({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: ta.value, go: "save" }) });
+        if (r.error) show(r.title, r.message || "", "", true);
+        else { msg.textContent = r.message || "Saved."; save.disabled = false; }
+      } catch (e) { msg.textContent = String(e.message || e); save.disabled = false; }
+    };
   }).catch((e) => show("Couldn't load", String(e.message || e), "", true));
 })();
 </script>
