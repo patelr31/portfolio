@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>LinkedIn Autopost</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#08090B; --card:#121419; --line:#262a33; --text:#eef1f5; --muted:#9aa3ad; --go:#41d6ba; --go-ink:#06231d; --link:#7d9bff; --bad:#ff8a8a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:28px 16px 48px; }
+  .tag { font-size:13px; color:var(--muted); letter-spacing:.04em; text-transform:uppercase; margin:0 0 6px; }
+  h1 { font-size:24px; line-height:1.25; margin:0 0 14px; }
+  p { margin:0 0 12px; white-space:pre-wrap; }
+  .muted { color:var(--muted); font-size:14px; }
+  .bad { color:var(--bad); }
+  a { color:var(--link); }
+  textarea { width:100%; min-height:380px; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--text); font:15px/1.5 inherit; font-family:inherit; resize:vertical; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; align-items:center; }
+  button { font:600 16px inherit; font-family:inherit; padding:12px 18px; border-radius:10px; border:0; cursor:pointer; }
+  button[disabled] { opacity:.5; cursor:default; }
+  .go { background:var(--go); color:var(--go-ink); }
+  .alt { background:var(--line); color:var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <p class="tag">LinkedIn autopost</p>
+  <h1 id="title">Loading…</h1>
+  <div id="out"></div>
+</main>
+<script>
+(() => {
+  const FN = "https://afpkwgitlwzvogoqhauw.supabase.co/functions/v1/li-post";
+  const $title = document.getElementById("title"), $out = document.getElementById("out");
+
+  function show(title, message, link, isError) {
+    $title.textContent = title;
+    $out.replaceChildren();
+    if (message) { const p = document.createElement("p"); p.textContent = message; if (isError) p.className = "bad"; $out.append(p); }
+    if (link) { const a = document.createElement("a"); a.href = link; a.textContent = "Open on LinkedIn"; a.rel = "noopener"; const p = document.createElement("p"); p.append(a); $out.append(p); }
+  }
+
+  // Result pages: the functions redirect here with #t=<title>&m=<message>&l=<link>
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.get("t")) {
+    const l = hash.get("l");
+    show(hash.get("t"), hash.get("m") || "", l && /^https:\/\/www\.linkedin\.com\//.test(l) ? l : "", hash.get("e") === "1");
+    return;
+  }
+
+  // Edit page: ?a=edit&id=<n>&s=<signature>
+  const q = new URLSearchParams(location.search);
+  const id = q.get("id"), s = q.get("s");
+  if (q.get("a") !== "edit" || !/^\d+$/.test(id || "") || !s) { show("Nothing here", "Open this page from a LinkedIn autopost notification."); return; }
+  const api = `${FN}?a=edit&id=${id}&s=${encodeURIComponent(s)}`;
+
+  async function call(init) {
+    const r = await fetch(api, init);
+    let j = {};
+    try { j = await r.json(); } catch {}
+    if (!r.ok && !j.title) throw new Error(`Request failed (${r.status})`);
+    return j;
+  }
+
+  call().then((p) => {
+    if (p.error) { show(p.title || "Not allowed", p.message || "", "", true); return; }
+    $title.textContent = `Edit: ${p.title}`;
+    const ta = document.createElement("textarea"); ta.maxLength = 3000; ta.value = p.body;
+    const count = document.createElement("p"); count.className = "muted";
+    const status = p.status;
+    const upd = () => { count.textContent = `${ta.value.length} / 3000 characters. Status: ${status}.`; };
+    ta.addEventListener("input", upd); upd();
+    const post = document.createElement("button"); post.className = "go"; post.textContent = "Save and post";
+    const save = document.createElement("button"); save.className = "alt"; save.textContent = "Save only";
+    const msg = document.createElement("p"); msg.className = "muted";
+    const row = document.createElement("div"); row.className = "row"; row.append(post, save);
+    $out.replaceChildren(ta, count, row, msg);
+    if (status === "posted") { post.disabled = save.disabled = true; msg.textContent = "Already on LinkedIn, so it can't be edited here."; }
+
+    async function submit(go) {
+      if (go === "post" && !confirm("Publish this to LinkedIn now?")) return;
+      post.disabled = save.disabled = true; msg.textContent = go === "post" ? "Posting…" : "Saving…";
+      try {
+        const r = await call({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: ta.value, go }) });
+        if (go === "post" || r.error) show(r.title, r.message || "", r.link || "", !!r.error);
+        else { msg.textContent = r.message || "Saved."; post.disabled = save.disabled = false; }
+      } catch (e) { msg.textContent = String(e.message || e); post.disabled = save.disabled = false; }
+    }
+    post.onclick = () => submit("post");
+    save.onclick = () => submit("save");
+  }).catch((e) => show("Couldn't load", String(e.message || e), "", true));
+})();
+</script>
+</body>
+</html>
