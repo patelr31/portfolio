@@ -79,7 +79,7 @@
     const row = document.createElement("div"); row.className = "row"; row.append(save);
     $out.replaceChildren(ta, count, row, msg);
     if (status === "posted") { save.disabled = true; msg.textContent = "Already on LinkedIn, so it can't be edited here."; }
-    else msg.textContent = "Changes go out with the scheduled post at 9 am New York time.";
+    else msg.textContent = "Changes go out with this post at its scheduled time.";
 
     save.onclick = async () => {
       save.disabled = true; msg.textContent = "Saving…";
